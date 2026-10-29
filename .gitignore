@@ -1,0 +1,5 @@
+# PNG originals fetched via `npm run fetch-images -- --png` are for local,
+# offline use only. They are ~1.4 GB and are not committed to the repository.
+png/
+*.part-*
+.DS_Store

@@ -1,0 +1,16 @@
+{
+  "name": "dressing-atlas",
+  "version": "1.0.0",
+  "private": true,
+  "description": "DressingAtlas — trilingual AI costume reference gallery (data from COSTUME-DB-01)",
+  "type": "module",
+  "scripts": {
+    "start": "python3 -m http.server 8124 --bind 127.0.0.1",
+    "data": "node scripts/import-data.mjs",
+    "fetch-images": "node scripts/fetch-images.mjs",
+    "verify": "node scripts/verify.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
