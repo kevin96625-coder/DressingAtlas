@@ -71,7 +71,7 @@
 | 性感 | `SXY` | 140 |
 | **合计** | | **1,407** |
 
-图片规格:缩略图 360 × 540 WebP(`thumbs/`,按分类子目录存放);展示图最高 1366 × 2048 WebP(`img/`,少数为略小的 2:3 尺寸);原站另提供无损 PNG 原图(约 1.4 GB,不入库,可用脚本拉取,见下文)。
+图片规格:缩略图 360 × 540 WebP(`thumbs/`,按分类子目录存放);展示图最高 1366 × 2048 WebP(`img/`,少数为略小的 2:3 尺寸);另有无损 1366 × 2048 PNG 原图,运行 `npm run fetch-images -- --png` 抓取到本地 `png/`(约 1.3 GB)。
 
 ## 快速开始
 
@@ -83,12 +83,14 @@ npm start          # 等价于 python3 -m http.server 8124 --bind 127.0.0.1
 
 打开 <http://127.0.0.1:8124/> 即可浏览。仓库已包含全部图片,无需额外下载。
 
+> 本地运行时,若存在 `png/` 目录(`npm run fetch-images -- --png` 生成),大图弹窗的下载按钮会自动切换为**无损 PNG 原图**;GitHub Pages 等静态托管上则自动回退为同分辨率 WebP,页面行为完全一致。
+
 ## 数据与校验
 
 ```bash
 npm run data           # 从 scripts/source/costume-db.json 重建 data/costumes.json
 npm run fetch-images   # 从原站补齐 thumbs/ 与 img/(幂等,可反复运行)
-npm run fetch-images -- --png   # 额外拉取原站 PNG 原图到 png/(约 1.4 GB,已 gitignore)
+npm run fetch-images -- --png   # 额外拉取原站无损 PNG 原图到 png/(约 1.3 GB,已 gitignore)
 npm run verify         # 离线完整性校验(见下)
 ```
 
@@ -97,6 +99,7 @@ npm run verify         # 离线完整性校验(见下)
 - 数据 schema、1,407 条记录、8 个分类计数与原始抓取文件逐条对账(编号、关键词、路径)；
 - 分类与界面文案的中 / 英 / 日三语完整性(键集合、数组长度、类型一致)；
 - **全部 2,814 张图片**:存在性、WebP 签名、宽高(缩略图 360 × 540,展示图 2:3 竖图)；
+- **本地 png/ 目录(若已抓取)**:1,407 张 PNG 原图的签名与尺寸;未抓取时跳过并提示；
 - 页面接线:app.js 引用的每个元素 id、语言切换按钮、i18n 键、作者声明均存在。
 
 ## 部署
@@ -119,6 +122,7 @@ DressingAtlas/
 │   └── favicon.svg
 ├── data/costumes.json      # 全量数据(含三语分类名与搜索别名)
 ├── thumbs/<分类>/<id>.webp  # 360 × 540 缩略图
+├── png/<分类>/<id>.png      # 无损原图(fetch --png 后生成,已 gitignore)
 ├── img/<分类>/<id>.webp     # 最高 1366 × 2048 展示图
 ├── scripts/
 │   ├── import-data.mjs     # 原始抓取 → 稳定 schema

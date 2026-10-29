@@ -160,6 +160,43 @@ for (const dir of ['thumbs', 'img']) {
   }
 }
 
+/* PNG originals (optional, not committed to the repo) ---------------------- */
+const pngSize = (buffer) => {
+  if (buffer.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a') return null;
+  return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
+};
+
+let pngChecked = 0;
+const pngDims = new Map();
+if (await exists('png')) {
+  for (const item of data.items) {
+    const rel = item.original;
+    if (!(await exists(rel))) { fail(`Missing PNG original: ${rel}`); continue; }
+    const handle = await open(path.join(root, rel), 'r');
+    const buffer = Buffer.alloc(32);
+    await handle.read(buffer, 0, 32, 0);
+    await handle.close();
+    const dims = pngSize(buffer);
+    if (!dims) fail(`${rel}: not a PNG`);
+    else if (dims.width < IMG_MIN_WIDTH || Math.abs(dims.width / dims.height - IMG_ASPECT) > 0.01) {
+      fail(`${rel}: unexpected dimensions ${dims.width}x${dims.height}`);
+    } else {
+      const label = `${dims.width}x${dims.height}`;
+      pngDims.set(label, (pngDims.get(label) ?? 0) + 1);
+    }
+    pngChecked += 1;
+  }
+  for (const category of data.categories) {
+    const files = await readdir(path.join(root, 'png', category.key)).catch(() => null);
+    if (!files) { fail(`Missing directory: png/${category.key}`); continue; }
+    if (files.length !== category.count) {
+      fail(`png/${category.key}: expected ${category.count} files, got ${files.length}`);
+    }
+  }
+} else {
+  warns.push('PNG originals not fetched (npm run fetch-images -- --png); png/ checks skipped');
+}
+
 /* Page & repo wiring ------------------------------------------------------- */
 for (const file of ['index.html', 'assets/css/app.css', 'assets/js/app.js', 'assets/js/i18n.js',
   'assets/favicon.svg', 'data/costumes.json', 'scripts/import-data.mjs',
@@ -176,6 +213,10 @@ for (const match of appJs.matchAll(/\$\('([A-Za-z]\w*)'\)/g)) {
 }
 for (const attr of ['data-lang="zh"', 'data-lang="en"', 'data-lang="ja"']) {
   if (!html.includes(attr)) fail(`Language switch incomplete: ${attr} missing`);
+}
+if (!/rel="canonical"/.test(html)) fail('canonical link missing');
+if (!html.includes('content="https://kevin96625-coder.github.io/DressingAtlas/og-cover.jpg"')) {
+  fail('og:image / twitter:image must use the absolute Pages URL');
 }
 if (!html.includes('type="module" src="assets/js/app.js"')) fail('app.js not wired as module');
 if (/cloudflareinsights|cf-beacon/.test(html)) fail('Original site analytics beacon must not be copied');
@@ -205,5 +246,6 @@ console.log(
   `OK · ${data.totals.items} costumes · ${data.totals.images} images checked · ` +
   `${data.totals.categories} categories · ${LANGS.length} languages · ` +
   `${checked} WebP signatures + dimensions verified` +
+  (pngChecked ? ` · ${pngChecked} PNG originals verified` : '') +
   (imageDims.size ? ` · image sizes: ${[...imageDims.entries()].sort((a, b) => b[1] - a[1]).map(([dims, count]) => `${dims}×${count}`).join(', ')}` : '')
 );

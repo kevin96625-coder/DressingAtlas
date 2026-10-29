@@ -10,6 +10,7 @@ const state = {
   categories: new Map(),
   current: -1,
   data: null,
+  pngAvailable: false,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -44,6 +45,8 @@ const els = {
   modalPrompt: $('modalPrompt'),
   copyPrompt: $('copyPrompt'),
   downloadLink: $('downloadLink'),
+  downloadLabel: document.querySelector('#downloadLink span'),
+  downloadNote: document.querySelector('.panel__note'),
   originalLink: $('originalLink'),
 };
 
@@ -236,8 +239,15 @@ function fillModal(item) {
   }).flat());
 
   els.modalPrompt.textContent = item.keywords;
-  els.downloadLink.href = item.image;
-  els.downloadLink.setAttribute('download', `${item.id}.webp`);
+
+  // With png/ fetched locally (`npm run fetch-images -- --png`) the download
+  // button serves the lossless original; on static hosting it falls back to
+  // the same-resolution WebP.
+  const usePng = state.pngAvailable;
+  els.downloadLink.href = usePng ? item.original : item.image;
+  els.downloadLink.setAttribute('download', `${item.id}.${usePng ? 'png' : 'webp'}`);
+  els.downloadLabel.textContent = usePng ? d.downloadPng : d.download;
+  els.downloadNote.textContent = usePng ? d.downloadNotePng : d.downloadNote;
   els.originalLink.href = new URL(item.original, 'https://ai-costume-gallery.pages.dev/').href;
 
   const previous = state.filtered[state.current - 1];
@@ -398,11 +408,47 @@ document.addEventListener('keydown', (event) => {
   else if (event.key === 'ArrowRight') move(1);
 });
 
+/* 弹窗内 Tab 焦点圈:焦点不会跑到弹窗后面的页面元素上 */
+els.modalBox.addEventListener('keydown', (event) => {
+  if (event.key !== 'Tab') return;
+  const focusables = [...els.modalBox.querySelectorAll('button, a[href], [tabindex]:not([tabindex="-1"])')]
+    .filter((node) => !node.disabled && node.offsetParent !== null);
+  if (!focusables.length) return;
+  const first = focusables[0];
+  const last = focusables[focusables.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+});
+
+/* 弹窗未打开时,Esc 关闭「使用提示 / 注意事项」面板 */
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape' || !els.modal.hidden) return;
+  for (const panel of els.info.querySelectorAll('.info__panel')) panel.hidden = true;
+  for (const tab of els.info.querySelectorAll('.info__tab')) tab.setAttribute('aria-expanded', 'false');
+});
+
 window.addEventListener('pageshow', () => {
   if (!els.modal.hidden && state.current >= 0) fillModal(state.filtered[state.current]);
 });
 
 /* 起動 ---------------------------------------------------------------------- */
+async function probePng() {
+  // One HEAD request decides whether lossless PNG originals can be served
+  // from this deployment (true locally with png/ fetched, false on Pages).
+  try {
+    const response = await fetch(state.items[0].original, { method: 'HEAD' });
+    const type = response.headers.get('content-type') ?? '';
+    return response.ok && type.includes('image/png');
+  } catch {
+    return false;
+  }
+}
+
 async function boot() {
   try {
     state.data = await loadData();
@@ -422,9 +468,8 @@ async function boot() {
   const params = new URLSearchParams(window.location.search);
   const langParam = params.get('lang');
   setLang(langParam && LANGS.includes(langParam) ? langParam : state.lang, { updateUrl: false });
-  if (langParam && LANGS.includes(langParam) && langParam !== detectLang()) {
-    // Explicit ?lang= wins over stored preference for this visit.
-  }
+
+  state.pngAvailable = await probePng();
 
   const categoryParam = params.get('category');
   if (categoryParam && (categoryParam === 'all' || state.categories.has(categoryParam))) {

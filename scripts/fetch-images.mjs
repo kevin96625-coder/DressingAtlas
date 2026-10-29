@@ -43,8 +43,11 @@ async function alreadyValid(rel) {
   try {
     const info = await stat(path.join(root, rel));
     if (info.size < 512) return false;
-    const handle = await readFile(path.join(root, rel), { flag: 'r' });
-    return signatureValid(rel, handle.subarray(0, 64)) && handle.length === info.size;
+    const handle = await open(path.join(root, rel), 'r');
+    const buffer = Buffer.alloc(512);
+    await handle.read(buffer, 0, 512, 0);
+    await handle.close();
+    return signatureValid(rel, buffer);
   } catch {
     return false;
   }
